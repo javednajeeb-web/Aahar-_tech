@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aahar Tech - SaaS Platform</title>
+    <title>Aahar Tech - Cloud Restaurant Management</title>
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,83 +14,123 @@
         body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; padding: 15px; box-sizing: border-box; }
         .container { max-width: 500px; margin: 0 auto; }
         .portal-bar { display: flex; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; justify-content: space-between; }
-        .portal-bar button { background: transparent; color: var(--text-muted); border: none; padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        .portal-bar button { background: transparent; color: var(--text-muted); border: none; padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; border-radius: 8px; flex: 1; transition: 0.2s; }
         .portal-bar button.active { background: var(--primary); color: var(--bg); }
-        .view-section { display: none; background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 16px; }
+        .view-section { display: none; background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         .view-section.active { display: block; }
-        h2 { margin-top: 0; color: var(--primary); font-size: 20px; }
+        h2 { margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
         label { display: block; margin-top: 15px; font-size: 13px; color: var(--text-muted); }
-        input { width: 100%; padding: 12px; margin-top: 5px; background: var(--bg); border: 1px solid #374151; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        .action-btn { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; margin-top: 20px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        input { width: 100%; padding: 12px; margin-top: 5px; background: var(--bg); border: 1px solid #374151; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        .action-btn { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; margin-top: 20px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; }
+        .action-btn:active { transform: scale(0.98); }
         .list-item { background: #111827; border: 1px solid #374151; padding: 15px; border-radius: 10px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
         .del-btn { background: var(--danger); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .loading { text-align: center; color: var(--text-muted); padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <!-- नेविगेशन बार -->
     <div class="portal-bar">
         <button onclick="switchPortal('customer')" id="nav-customer" class="active">📱 Customer Menu</button>
         <button onclick="switchPortal('owner')" id="nav-owner">👨‍🍳 Owner Portal</button>
     </div>
 
+    <!-- कस्टमर मेनू व्यू -->
     <div id="view-customer" class="view-section active">
         <h2>📱 Live Cloud Menu</h2>
-        <div id="customerMenuList">लोड हो रहा है...</div>
+        <div id="customerMenuList" class="loading">डेटा लोड हो रहा है...</div>
     </div>
 
+    <!-- ओनर पोर्टल व्यू -->
     <div id="view-owner" class="view-section">
         <h2>👨‍🍳 Owner Cloud Dashboard</h2>
         <label>डिश का नाम (Dish Name)</label>
         <input type="text" id="dishName" placeholder="जैसे: Chicken Biryani">
 
         <label>कीमत (Price in ₹)</label>
-        <input type="text" id="dishPrice" placeholder="जैसे: 399">
+        <input type="number" id="dishPrice" placeholder="जैसे: 399">
 
         <button class="action-btn" onclick="addCloudDish()">➕ डेटाबेस में जोड़ें</button>
-        <div id="ownerMenuList" style="margin-top: 20px;"></div>
+        
+        <h3 style="font-size: 16px; margin-top: 25px; color: var(--text-muted);">मैनेज करें (Manage Dishes)</h3>
+        <div id="ownerMenuList"></div>
     </div>
 </div>
 
 <script>
-    // --- आपकी Supabase डिटेल्स ---
+    // --- Supabase कॉन्फ़िगरेशन (एकीकृत) ---
     const SUPABASE_URL = 'https://ftsqtekwhwkralhnaaqj.supabase.co';
-    const  sb_publishable_wCPCZGl-URZG_lHlhsb26w_7T8nbwZf ='sb_publishable_wCPCZGl-URZG_lHlhsb26w_7T8nbwZf'; // आपकी पब्लिशेबल की यहाँ सेट है
+    const SUPABASE_ANON_KEY = 'sb_publishable_wCPCZGl-URZG_lHlhsb26w_7T8nbwZf';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // पोर्टल स्विच करने का सटीक फंक्शन
     function switchPortal(portal) {
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.portal-bar button').forEach(b => b.classList.remove('active'));
+        
         document.getElementById('view-' + portal).classList.add('active');
         document.getElementById('nav-' + portal).classList.add('active');
-        if(portal === 'customer') fetchMenu('customerMenuList', false);
-        if(portal === 'owner') fetchMenu('ownerMenuList', true);
+        
+        if(portal === 'customer') {
+            fetchMenu('customerMenuList', false);
+        } else if(portal === 'owner') {
+            fetchMenu('ownerMenuList', true);
+        }
     }
 
+    // डेटाबेस से मेनू फैच करने का फंक्शन
     async function fetchMenu(elementId, isAdmin) {
         const list = document.getElementById(elementId);
-        list.innerHTML = 'लोड हो रहा है...';
+        list.innerHTML = '<div class="loading">डेटा लोड हो रहा है...</div>';
         
         const { data, error } = await _supabase.from('aahar_dishes').select('*').order('id', { ascending: false });
         
-        if (error) { list.innerHTML = 'एरर: ' + error.message; return; }
-        if (!data || data.length === 0) { list.innerHTML = '<p style="color:gray;">कोई डिश उपलब्ध नहीं है।</p>'; return; }
+        if (error) { 
+            list.innerHTML = `<p style="color:var(--danger);">कनेक्शन एरर: ${error.message}</p>`; 
+            return; 
+        }
+        
+        if (!data || data.length === 0) { 
+            list.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:15px;">कोई डिश उपलब्ध नहीं है।</p>'; 
+            return; 
+        }
 
         list.innerHTML = '';
         data.forEach(d => {
             if(isAdmin) {
-                list.innerHTML += `<div class="list-item"><div><b>${d.name}</b><br><span style="color:var(--accent);">₹${d.price}</span></div><button class="del-btn" onclick="deleteDish(${d.id})">Delete</button></div>`;
+                list.innerHTML += `
+                    <div class="list-item">
+                        <div>
+                            <b>${escapeHtml(d.name)}</b><br>
+                            <span style="color:var(--accent); font-weight:bold;">₹${d.price}</span>
+                        </div>
+                        <button class="del-btn" onclick="deleteDish(${d.id})">Delete</button>
+                    </div>`;
             } else {
-                list.innerHTML += `<div class="list-item"><div><b style="font-size:16px;">${d.name}</b><br><span style="color:var(--accent); font-size:15px; font-weight:bold;">₹${d.price}</span></div><button style="background:var(--accent); color:white; border:none; padding:10px 16px; border-radius:8px; font-weight:bold; cursor:pointer;" onclick="alert('ऑर्डर सफल!')">Order Now</button></div>`;
+                list.innerHTML += `
+                    <div class="list-item">
+                        <div>
+                            <b style="font-size:16px;">${escapeHtml(d.name)}</b><br>
+                            <span style="color:var(--accent); font-size:15px; font-weight:bold;">₹${d.price}</span>
+                        </div>
+                        <button style="background:var(--accent); color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:pointer;" onclick="alert('ऑर्डर सफल!')">Order</button>
+                    </div>`;
             }
         });
     }
 
+    // नई डिश जोड़ने का फंक्शन
     async function addCloudDish() {
         const name = document.getElementById('dishName').value.trim();
         const price = document.getElementById('dishPrice').value.trim();
 
-        if(!name || !price) { alert('कृपया नाम और कीमत दोनों भरें!'); return; }
+        if(!name || !price) { 
+            alert('कृपया डिश का नाम और कीमत दोनों भरें!'); 
+            return; 
+        }
 
         const { error } = await _supabase.from('aahar_dishes').insert([{ name: name, price: price }]);
 
@@ -104,11 +145,24 @@
         fetchMenu('ownerMenuList', true);
     }
 
+    // डिश डिलीट करने का फंक्शन
     async function deleteDish(id) {
-        await _supabase.from('aahar_dishes').delete().eq('id', id);
+        if(!confirm('क्या आप वाकई इस डिश को हटाना चाहते हैं?')) return;
+        const { error } = await _supabase.from('aahar_dishes').delete().eq('id', id);
+        if(error) {
+            alert('डिलिट करने में समस्या: ' + error.message);
+            return;
+        }
         fetchMenu('ownerMenuList', true);
     }
 
+    // सुरक्षा के लिए HTML Escape फंक्शन
+    function escapeHtml(text) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // पेज लोड होते ही कस्टमर मेनू फेच करें
     fetchMenu('customerMenuList', false);
 </script>
 
