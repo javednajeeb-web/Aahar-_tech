@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aahar Tech - SaaS Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #0b0f19; --card-bg: #161e2e; --accent: #10b981;
+            --primary: #38bdf8; --text: #f3f4f6; --text-muted: #9ca3af; --border: #1f2937; --danger: #ef4444;
+        }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; padding: 15px; box-sizing: border-box; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .portal-bar { display: flex; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; justify-content: space-between; }
+        .portal-bar button { background: transparent; color: var(--text-muted); border: none; padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        .portal-bar button.active { background: var(--primary); color: var(--bg); }
+        .view-section { display: none; background: var(--card-bg); border: 1px solid var(--border); padding: 20px; border-radius: 16px; }
+        .view-section.active { display: block; }
+        h2 { margin-top: 0; color: var(--primary); font-size: 20px; }
+        label { display: block; margin-top: 15px; font-size: 13px; color: var(--text-muted); }
+        input { width: 100%; padding: 12px; margin-top: 5px; background: var(--bg); border: 1px solid #374151; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .action-btn { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; margin-top: 20px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .list-item { background: #111827; border: 1px solid #374151; padding: 15px; border-radius: 10px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .del-btn { background: var(--danger); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="portal-bar">
+        <button onclick="switchPortal('customer')" id="nav-customer" class="active">📱 Customer Menu</button>
+        <button onclick="switchPortal('owner')" id="nav-owner">👨‍🍳 Owner Portal</button>
+    </div>
+
+    <div id="view-customer" class="view-section active">
+        <h2>📱 Live Cloud Menu</h2>
+        <div id="customerMenuList">लोड हो रहा है...</div>
+    </div>
+
+    <div id="view-owner" class="view-section">
+        <h2>👨‍🍳 Owner Cloud Dashboard</h2>
+        <label>डिश का नाम (Dish Name)</label>
+        <input type="text" id="dishName" placeholder="जैसे: Chicken Biryani">
+
+        <label>कीमत (Price in ₹)</label>
+        <input type="text" id="dishPrice" placeholder="जैसे: 399">
+
+        <button class="action-btn" onclick="addCloudDish()">➕ डेटाबेस में जोड़ें</button>
+        <div id="ownerMenuList" style="margin-top: 20px;"></div>
+    </div>
+</div>
+
+<script>
+    // --- आपकी Supabase डिटेल्स ---
+    const SUPABASE_URL = 'https://ftsqtekwhwkralhnaaqj.supabase.co';
+    const  sb_publishable_wCPCZGl-URZG_lHlhsb26w_7T8nbwZf ='sb_publishable_wCPCZGl-URZG_lHlhsb26w_7T8nbwZf'; // आपकी पब्लिशेबल की यहाँ सेट है
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function switchPortal(portal) {
+        document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.portal-bar button').forEach(b => b.classList.remove('active'));
+        document.getElementById('view-' + portal).classList.add('active');
+        document.getElementById('nav-' + portal).classList.add('active');
+        if(portal === 'customer') fetchMenu('customerMenuList', false);
+        if(portal === 'owner') fetchMenu('ownerMenuList', true);
+    }
+
+    async function fetchMenu(elementId, isAdmin) {
+        const list = document.getElementById(elementId);
+        list.innerHTML = 'लोड हो रहा है...';
+        
+        const { data, error } = await _supabase.from('aahar_dishes').select('*').order('id', { ascending: false });
+        
+        if (error) { list.innerHTML = 'एरर: ' + error.message; return; }
+        if (!data || data.length === 0) { list.innerHTML = '<p style="color:gray;">कोई डिश उपलब्ध नहीं है।</p>'; return; }
+
+        list.innerHTML = '';
+        data.forEach(d => {
+            if(isAdmin) {
+                list.innerHTML += `<div class="list-item"><div><b>${d.name}</b><br><span style="color:var(--accent);">₹${d.price}</span></div><button class="del-btn" onclick="deleteDish(${d.id})">Delete</button></div>`;
+            } else {
+                list.innerHTML += `<div class="list-item"><div><b style="font-size:16px;">${d.name}</b><br><span style="color:var(--accent); font-size:15px; font-weight:bold;">₹${d.price}</span></div><button style="background:var(--accent); color:white; border:none; padding:10px 16px; border-radius:8px; font-weight:bold; cursor:pointer;" onclick="alert('ऑर्डर सफल!')">Order Now</button></div>`;
+            }
+        });
+    }
+
+    async function addCloudDish() {
+        const name = document.getElementById('dishName').value.trim();
+        const price = document.getElementById('dishPrice').value.trim();
+
+        if(!name || !price) { alert('कृपया नाम और कीमत दोनों भरें!'); return; }
+
+        const { error } = await _supabase.from('aahar_dishes').insert([{ name: name, price: price }]);
+
+        if (error) {
+            alert('डिश जोड़ने में असफल: ' + error.message);
+            return;
+        }
+
+        document.getElementById('dishName').value = '';
+        document.getElementById('dishPrice').value = '';
+        alert('✅ डिश सीधे क्लाउड डेटाबेस में लाइव हो गई!');
+        fetchMenu('ownerMenuList', true);
+    }
+
+    async function deleteDish(id) {
+        await _supabase.from('aahar_dishes').delete().eq('id', id);
+        fetchMenu('ownerMenuList', true);
+    }
+
+    fetchMenu('customerMenuList', false);
+</script>
+
+</body>
+</html>
